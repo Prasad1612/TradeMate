@@ -61,14 +61,14 @@
                             class="text-blue-500">Mate</span></span>
                 </div>
                 <div class="flex space-x-4 text-sm font-medium flex-shrink-0">
+                    <button onclick="showTab('institutional')" id="btn-institutional"
+                        class="px-3 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-500 transition-colors whitespace-nowrap">Institutional
+                        Mgr</button>
                     <button onclick="showTab('analyzer')" id="btn-analyzer"
-                        class="px-3 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-500 transition-colors whitespace-nowrap">Analyzer</button>
+                        class="px-3 py-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors whitespace-nowrap">Analyzer</button>
                     <button onclick="showTab('average')" id="btn-average"
                         class="px-3 py-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors whitespace-nowrap">Avg.
                         Price</button>
-                    <button onclick="showTab('institutional')" id="btn-institutional"
-                        class="px-3 py-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors whitespace-nowrap">Institutional
-                        Mgr</button>
                 </div>
             </div>
         </div>
@@ -768,8 +768,10 @@
         // Initialize the first tab as active
         window.onload = () => {
             lucide.createIcons();
-            showTab('analyzer');
-            // Initial run of the analyzer on load (to clear defaults)
+            showTab('institutional');
+            // Initial run of the calculations on load
+            calcInstRisk();
+            calcMonthlyReturn();
             calcTradeAnalyzer();
         }
 
