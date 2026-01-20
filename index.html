@@ -366,13 +366,34 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
                     <!-- Left Column: Inputs -->
-                    <div class="lg:col-span-5 space-y-6">
-                        <div class="bg-slate-900/40 p-5 rounded-xl border border-slate-700 space-y-4">
-                            <h3 class="text-indigo-400 font-semibold flex items-center gap-2">
+                    <div class="lg:col-span-5 space-y-4">
+                        <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-700 space-y-3">
+                            <h3 class="text-indigo-400 font-semibold flex items-center gap-2 text-sm">
                                 <i data-lucide="wallet" class="w-4 h-4"></i> Capital Settings
                             </h3>
+
+                            <!-- Trade Direction Toggle -->
+                            <div class="mb-3">
+                                <label class="block text-[10px] text-slate-500 mb-1 uppercase">Direction</label>
+                                <div class="flex bg-slate-700 rounded-lg p-0.5" oninput="calcInstRisk()">
+                                    <input type="radio" id="inst-trade-buy" name="inst-trade-type" value="buy"
+                                        class="hidden peer/buy" checked />
+                                    <label for="inst-trade-buy"
+                                        class="flex-1 text-center py-1 px-2 rounded-md cursor-pointer transition-colors text-white font-medium text-xs bg-slate-600 peer-checked/buy:bg-green-600">
+                                        Buy
+                                    </label>
+
+                                    <input type="radio" id="inst-trade-sell" name="inst-trade-type" value="sell"
+                                        class="hidden peer/sell" />
+                                    <label for="inst-trade-sell"
+                                        class="flex-1 text-center py-1 px-2 rounded-md cursor-pointer transition-colors text-white font-medium text-xs bg-slate-600 peer-checked/sell:bg-red-600">
+                                        Sell
+                                    </label>
+                                </div>
+                            </div>
+
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-xs text-slate-500 mb-1 caps">Total Capital (₹)</label>
@@ -543,8 +564,12 @@
                             <div class="space-y-4">
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="flex items-center justify-between text-sm">
-                                        <span class="text-slate-400">Total Capital At Risk</span>
-                                        <span id="inst-res-total-risk" class="font-semibold text-red-red-400">₹0</span>
+                                        <span class="text-slate-400 flex items-center gap-1">
+                                            Total Capital At Risk
+                                            <i id="inst-risk-warning" data-lucide="alert-triangle"
+                                                class="w-5 h-5 text-yellow-500 hidden"></i>
+                                        </span>
+                                        <span id="inst-res-total-risk" class="font-semibold text-red-400">₹0</span>
                                     </div>
                                     <div class="flex items-center justify-between text-sm">
                                         <span class="text-slate-400">Margin Required</span>
@@ -1011,23 +1036,48 @@
             let totalQty = 0, totalCost = 0, actualRiskAmt = 0;
             const entryQtys = [0, 0, 0];
 
-            // Validate entry positions relative to SL
+            // Get selected trade direction from toggle
+            const tradeDirection = document.querySelector('input[name="inst-trade-type"]:checked').value;
+            const isLong = tradeDirection === 'buy';
+
+            // Validate that all entries are on the correct side of SL based on selected direction
             let hasInvalidEntry = false;
+            let invalidEntryNumbers = [];
+
             entries.forEach((price, idx) => {
                 if (price > 0 && sl > 0) {
-                    // For a long position, entry should be above SL
-                    // For a short position, entry should be below SL
-                    // We'll assume long if any entry is above SL
-                    const isLong = e1 > sl;
-                    if ((isLong && price < sl) || (!isLong && price > sl)) {
+                    if (isLong && price <= sl) {
                         hasInvalidEntry = true;
+                        invalidEntryNumbers.push(idx + 1);
+                    } else if (!isLong && price >= sl) {
+                        hasInvalidEntry = true;
+                        invalidEntryNumbers.push(idx + 1);
                     }
                 }
             });
 
+            // If invalid entries detected, stop calculation and reset
             if (hasInvalidEntry) {
-                // Show warning but continue with calculation
-                console.warn('Warning: One or more entry prices are on the wrong side of stop loss');
+                const direction = isLong ? "LONG" : "SHORT";
+                const requirement = isLong ? "above (>)" : "below (<)";
+                console.error(`Invalid ${direction} position: Entry ${invalidEntryNumbers.join(', ')} must be ${requirement} Stop Loss (${sl})`);
+
+                // Reset all displays
+                document.getElementById('inst-res-avg-entry').innerText = "0.00";
+                document.getElementById('inst-res-total-qty').innerText = "0";
+                document.getElementById('inst-res-total-risk').innerText = "₹0";
+                document.getElementById('inst-res-rr').innerText = "1 : 0.00";
+                document.getElementById('inst-res-profit').innerText = "₹0";
+                document.getElementById('inst-res-margin').innerText = "₹0";
+                document.getElementById('inst-res-risk-pct-out').innerText = "0%";
+                document.getElementById('inst-risk-per-share').innerText = '₹0.00';
+                document.getElementById('inst-reward-per-share').innerText = '₹0.00';
+                document.getElementById('inst-share-amount').innerText = '0';
+                document.getElementById('inst-sl-dist-pct').innerText = '0.00%';
+                document.getElementById('inst-target-dist-pct').innerText = '0.00%';
+                document.getElementById('inst-res-profit-pct-margin').innerText = "0%";
+                document.getElementById('inst-res-profit-pct-capital').innerText = "0%";
+                return;
             }
 
             entries.forEach((price, idx) => {
@@ -1086,7 +1136,37 @@
 
             document.getElementById('inst-res-avg-entry').innerText = avgEntry.toFixed(2);
             document.getElementById('inst-res-total-qty').innerText = totalQty.toLocaleString('en-IN');
-            document.getElementById('inst-res-total-risk').innerText = formatCurrency(actualRiskAmt);
+            const totalRiskEl = document.getElementById('inst-res-total-risk');
+            const warningEl = document.getElementById('inst-risk-warning');
+
+            totalRiskEl.innerText = formatCurrency(actualRiskAmt);
+
+            const actualRiskPctEl = document.getElementById('inst-res-risk-pct-out');
+
+            // Risk Waring Logic
+            if (actualRiskAmt > totalRiskAmt) {
+                // Risk exceeded: Show warning with blink effect
+                warningEl.classList.remove('hidden');
+                warningEl.classList.add('animate-pulse');
+
+                // Make Actual Risk % Big and Blinking
+                actualRiskPctEl.classList.add('text-2xl', 'animate-pulse', 'text-red-500');
+                actualRiskPctEl.classList.remove('text-red-400', 'font-semibold');
+                actualRiskPctEl.classList.add('font-bold');
+            } else {
+                // Risk within limits: Hide warning
+                warningEl.classList.add('hidden');
+                warningEl.classList.remove('animate-pulse');
+
+                // Reset Actual Risk % style
+                actualRiskPctEl.classList.remove('text-2xl', 'animate-pulse', 'text-red-500', 'font-bold');
+                actualRiskPctEl.classList.add('text-red-400', 'font-semibold');
+            }
+
+            // Ensure amount is always red as requested
+            totalRiskEl.classList.remove('text-white');
+            totalRiskEl.classList.add('text-red-400');
+
             document.getElementById('inst-res-rr').innerText = `1 : ${rr.toFixed(2)}`;
             document.getElementById('inst-res-profit').innerText = formatCurrency(potentialProfit);
             document.getElementById('inst-res-margin').innerText = formatCurrency(marginRequired);
@@ -1135,8 +1215,8 @@
             const filteredPts = pts.filter(p => p > 0);
             const actualMin = Math.min(...filteredPts), actualMax = Math.max(...filteredPts);
             const actualRange = actualMax - actualMin;
-            // Add padding to allows dragging beyond extrema
-            const padding = actualRange * 0.1 || actualMin * 0.05 || 10;
+            // Add more padding to prevent overlap (20% instead of 10%)
+            const padding = actualRange * 0.2 || actualMin * 0.1 || 20;
             const visMin = actualMin - padding, visMax = actualMax + padding, visRange = visMax - visMin;
             const getPos = (p) => (p > 0 && visRange > 0) ? ((p - visMin) / visRange * 100) : 50;
 
@@ -1177,7 +1257,8 @@
                 if (!isDragging) return;
                 const rect = container.getBoundingClientRect();
                 const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-                let pct = Math.max(0, Math.min(100, (x / rect.width) * 100));
+                // Allow dragging outside the box (remove clamping 0-100) to let values change freely
+                let pct = (x / rect.width) * 100;
 
                 const e1 = parseFloat(document.getElementById('inst-e1').value) || 0;
                 const e2 = parseFloat(document.getElementById('inst-e2').value) || 0;
@@ -1192,11 +1273,14 @@
                 const filteredPts = pts.filter(p => p > 0);
                 const actualMin = Math.min(...filteredPts), actualMax = Math.max(...filteredPts);
                 const actualRange = actualMax - actualMin;
-                const padding = actualRange * 0.1 || actualMin * 0.05 || 10;
+                // Update padding to match the visualization logic (40%)
+                const padding = actualRange * 0.4 || actualMin * 0.2 || 30;
                 const visMin = actualMin - padding, visMax = actualMax + padding, visRange = visMax - visMin;
 
                 if (visRange > 0) {
-                    currentInput.value = Math.round(visMin + (visRange * (pct / 100)));
+                    // Use toFixed(2) for precision instead of rounding to integer which caused "jumpiness"
+                    let newVal = visMin + (visRange * (pct / 100));
+                    currentInput.value = newVal.toFixed(2);
                     calcInstRisk();
                 }
             };
