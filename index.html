@@ -387,11 +387,19 @@
                                         placeholder="1">
                                 </div>
                             </div>
-                            <div>
-                                <label class="block text-xs text-slate-500 mb-1">Intraday Leverage (X)</label>
-                                <input type="number" id="inst-leverage" oninput="calcInstRisk()"
-                                    class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:ring-1 focus:ring-indigo-500 transition-all font-mono"
-                                    placeholder="1" value="1">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-1">Risk Amount (₹)</label>
+                                    <div id="inst-risk-amount"
+                                        class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-red-400 font-mono text-sm">
+                                        ₹0</div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-1">Intraday Leverage (X)</label>
+                                    <input type="number" id="inst-leverage" oninput="calcInstRisk()"
+                                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:ring-1 focus:ring-indigo-500 transition-all font-mono"
+                                        placeholder="1" value="1">
+                                </div>
                             </div>
                         </div>
 
@@ -476,6 +484,31 @@
                                     <input type="number" id="inst-desired-rr" oninput="calcInstRisk('desired-rr')"
                                         class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-white outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-xs"
                                         placeholder="2" value="2">
+                                </div>
+                            </div>
+
+                            <!-- New metrics section -->
+                            <div
+                                class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 pt-2 border-t border-slate-700">
+                                <div class="text-center">
+                                    <p class="text-[9px] text-slate-500 uppercase mb-1">Risk/Share</p>
+                                    <p id="inst-risk-per-share" class="text-xs font-bold text-red-400">₹0.00</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-[9px] text-slate-500 uppercase mb-1">Reward/Share</p>
+                                    <p id="inst-reward-per-share" class="text-xs font-bold text-green-400">₹0.00</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-[9px] text-slate-500 uppercase mb-1">No.</p>
+                                    <p id="inst-share-amount" class="text-xs font-bold text-white">0</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-[9px] text-slate-500 uppercase mb-1">SL % CMP</p>
+                                    <p id="inst-sl-dist-pct" class="text-xs font-bold text-red-400">0.00%</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-[9px] text-slate-500 uppercase mb-1">TGT % CMP</p>
+                                    <p id="inst-target-dist-pct" class="text-xs font-bold text-green-400">0.00%</p>
                                 </div>
                             </div>
                         </div>
@@ -944,6 +977,13 @@
             const w2Val = parseFloat(document.getElementById('inst-w2').value) || 0.333;
             const w3Val = parseFloat(document.getElementById('inst-w3').value) || 0.334;
 
+            // Update Risk Amount display regardless of other validations
+            if (capital > 0 && riskPct > 0) {
+                document.getElementById('inst-risk-amount').innerText = formatCurrency(totalRiskAmt);
+            } else {
+                document.getElementById('inst-risk-amount').innerText = formatCurrency(0);
+            }
+
             if (capital <= 0 || riskPct <= 0 || e1 <= 0 || sl <= 0 || e1 === sl) {
                 ["inst-res-avg-entry", "inst-res-total-qty", "inst-res-rr"].forEach(id => {
                     const el = document.getElementById(id);
@@ -953,6 +993,11 @@
                 document.getElementById('inst-res-profit').innerText = "₹0";
                 document.getElementById('inst-res-margin').innerText = "₹0";
                 document.getElementById('inst-res-risk-pct-out').innerText = "0%";
+                document.getElementById('inst-risk-per-share').innerText = '₹0.00';
+                document.getElementById('inst-reward-per-share').innerText = '₹0.00';
+                document.getElementById('inst-share-amount').innerText = '0';
+                document.getElementById('inst-sl-dist-pct').innerText = '0.00%';
+                document.getElementById('inst-target-dist-pct').innerText = '0.00%';
                 if (!source || !source.startsWith('q')) {
                     document.getElementById('inst-q1').value = "0";
                     document.getElementById('inst-q2').value = "0";
@@ -965,6 +1010,25 @@
             const weights = [w1Val, w2Val, w3Val];
             let totalQty = 0, totalCost = 0, actualRiskAmt = 0;
             const entryQtys = [0, 0, 0];
+
+            // Validate entry positions relative to SL
+            let hasInvalidEntry = false;
+            entries.forEach((price, idx) => {
+                if (price > 0 && sl > 0) {
+                    // For a long position, entry should be above SL
+                    // For a short position, entry should be below SL
+                    // We'll assume long if any entry is above SL
+                    const isLong = e1 > sl;
+                    if ((isLong && price < sl) || (!isLong && price > sl)) {
+                        hasInvalidEntry = true;
+                    }
+                }
+            });
+
+            if (hasInvalidEntry) {
+                // Show warning but continue with calculation
+                console.warn('Warning: One or more entry prices are on the wrong side of stop loss');
+            }
 
             entries.forEach((price, idx) => {
                 const qInput = document.getElementById(`inst-q${idx + 1}`);
@@ -979,6 +1043,10 @@
                     } else {
                         // Auto-calculate quantity based on weight
                         q = Math.floor((totalRiskAmt * weight) / riskPerShare);
+                        // Ensure minimum quantity of 1 if we have enough risk capital
+                        if (q === 0 && totalRiskAmt >= riskPerShare) {
+                            q = 1;
+                        }
                         qInput.value = q;
                     }
 
@@ -986,6 +1054,7 @@
                     totalQty += q; totalCost += (q * price); actualRiskAmt += (q * riskPerShare);
                 } else {
                     if (qInput && (!source || !source.startsWith('q'))) qInput.value = 0;
+                    entryQtys[idx] = 0;
                 }
             });
 
@@ -1025,6 +1094,25 @@
 
             document.getElementById('inst-res-profit-pct-margin').innerText = roiMargin.toFixed(2) + "%";
             document.getElementById('inst-res-profit-pct-capital').innerText = roiCapital.toFixed(2) + "%";
+
+            // Update Capital Settings - Risk Amount
+            document.getElementById('inst-risk-amount').innerText = formatCurrency(totalRiskAmt);
+
+            // Update Strategy Exit metrics
+            document.getElementById('inst-risk-per-share').innerText = '₹' + riskFromAvg.toFixed(2);
+            document.getElementById('inst-reward-per-share').innerText = '₹' + rewardPerShare.toFixed(2);
+            document.getElementById('inst-share-amount').innerText = totalQty.toLocaleString('en-IN');
+
+            // CMP-based distance percentages
+            if (cmp > 0) {
+                const slDistPct = ((Math.abs(cmp - sl) / cmp) * 100);
+                const targetDistPct = ((Math.abs(target - cmp) / cmp) * 100);
+                document.getElementById('inst-sl-dist-pct').innerText = slDistPct.toFixed(2) + '%';
+                document.getElementById('inst-target-dist-pct').innerText = targetDistPct.toFixed(2) + '%';
+            } else {
+                document.getElementById('inst-sl-dist-pct').innerText = '0.00%';
+                document.getElementById('inst-target-dist-pct').innerText = '0.00%';
+            }
 
             // Update RR Bar
             const totalRR = riskFromAvg + rewardPerShare;
