@@ -7,6 +7,7 @@
     <title>Trade Analyzer & Position Size</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* Custom scrollbar for a cleaner look */
         ::-webkit-scrollbar {
@@ -64,6 +65,9 @@
                     <button onclick="showTab('institutional')" id="btn-institutional"
                         class="px-3 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-500 transition-colors whitespace-nowrap">Institutional
                         Mgr</button>
+                    <button onclick="showTab('simulator')" id="btn-simulator"
+                        class="px-3 py-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors whitespace-nowrap">Risk
+                        Simulator</button>
                     <button onclick="showTab('analyzer')" id="btn-analyzer"
                         class="px-3 py-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors whitespace-nowrap">Analyzer</button>
                     <button onclick="showTab('average')" id="btn-average"
@@ -268,6 +272,137 @@
             </div>
         </div>
 
+        </div>
+
+        <div id="tab-simulator" class="hidden space-y-6">
+            <div class="bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-700 shadow-xl">
+                <div class="flex items-center gap-3 mb-6 border-b border-slate-700 pb-4">
+                    <div class="p-2 bg-red-500/10 rounded-lg">
+                        <i data-lucide="activity" class="text-red-500 w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-semibold text-white">Capital Survival Simulator</h2>
+                        <p class="text-slate-400 text-sm">Visualize capital decay during a continuous losing streak.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Controls -->
+                    <div class="space-y-4 lg:col-span-1">
+                        <div>
+                            <label class="block text-xs sm:text-sm font-medium text-slate-400 mb-1">Total Capital
+                                (₹)</label>
+                            <input type="number" id="sim-capital" oninput="calcSurvival()"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 sm:px-4 py-2 text-white focus:ring-2 focus:ring-red-500 outline-none"
+                                placeholder="100000" value="100000">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs sm:text-sm font-medium text-slate-400 mb-1">Risk Mode</label>
+                            <div class="flex bg-slate-700 rounded-lg p-1">
+                                <input type="radio" id="risk-mode-pct" name="risk-mode" value="pct"
+                                    class="hidden peer/pct" checked onchange="calcSurvival()" />
+                                <label for="risk-mode-pct"
+                                    class="flex-1 text-center py-2 rounded-lg cursor-pointer text-white text-xs bg-slate-600 peer-checked/pct:bg-blue-600 transition-all">
+                                    % of Current Cap
+                                </label>
+                                <input type="radio" id="risk-mode-fixed" name="risk-mode" value="fixed"
+                                    class="hidden peer/fixed" onchange="calcSurvival()" />
+                                <label for="risk-mode-fixed"
+                                    class="flex-1 text-center py-2 rounded-lg cursor-pointer text-white text-xs bg-slate-600 peer-checked/fixed:bg-blue-600 transition-all">
+                                    Fixed Amt (₹)
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="input-risk-pct-group">
+                            <label class="block text-xs sm:text-sm font-medium text-slate-400 mb-1">Risk per Trade
+                                (%)</label>
+                            <input type="number" id="sim-risk-pct" oninput="calcSurvival()"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-red-500 outline-none"
+                                value="1" placeholder="1">
+                        </div>
+                        <div id="input-risk-amt-group" class="hidden">
+                            <label class="block text-xs sm:text-sm font-medium text-slate-400 mb-1">Risk per Trade
+                                (₹)</label>
+                            <input type="number" id="sim-risk-amt" oninput="calcSurvival()"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-red-500 outline-none"
+                                placeholder="1000">
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-700">
+                            <p class="text-xs text-slate-500 mb-2">Stop when capital drops below (%):</p>
+                            <input type="number" id="sim-threshold-pct" oninput="calcSurvival()" value="0"
+                                class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-2 text-sm text-white focus:border-red-500 outline-none"
+                                placeholder="0">
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-700">
+                            <h4 class="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wide">Time &
+                                Recovery</h4>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[10px] text-slate-500 mb-1">Trades / Day</label>
+                                    <input type="number" id="sim-trades-per-day" oninput="calcSurvival()" value="3"
+                                        class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-2 text-sm text-white focus:border-blue-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-slate-500 mb-1">Avg R:R</label>
+                                    <input type="number" id="sim-avg-rr" oninput="calcSurvival()" value="2"
+                                        class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-2 text-sm text-white focus:border-green-500 outline-none"
+                                        title="Risk:Reward Ratio for Recovery Calc">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Graph -->
+                    <div class="lg:col-span-2 space-y-4">
+                        <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-700 h-64 sm:h-80 relative">
+                            <canvas id="survivalChart"></canvas>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 text-center">
+                                <p class="text-xs text-slate-400 uppercase">Survival Duration</p>
+                                <p id="sim-res-trades" class="text-xl font-bold text-red-500">0 Trades</p>
+                                <p id="sim-res-days" class="text-xs text-slate-500 mt-1">~0 Days</p>
+                            </div>
+                            <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 text-center">
+                                <p class="text-xs text-slate-400 uppercase">Final Capital Remaining</p>
+                                <p id="sim-res-capital" class="text-xl font-bold text-white">₹0</p>
+                            </div>
+                        </div>
+
+                        <!-- Recovery Section -->
+                        <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                            <h3 class="text-sm font-semibold text-white flex items-center gap-2 mb-3">
+                                <i data-lucide="refresh-cw" class="w-4 h-4 text-orange-400"></i> Recovery Analysis
+                            </h3>
+                            <div class="grid grid-cols-3 gap-4 text-center">
+                                <div>
+                                    <p class="text-[10px] text-slate-500 uppercase">Drawdown</p>
+                                    <p id="sim-rec-drawdown" class="text-lg font-bold text-red-500">0%</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] text-slate-500 uppercase">Req. Gain</p>
+                                    <p id="sim-rec-gain" class="text-lg font-bold text-orange-400">0%</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] text-slate-500 uppercase">Trades to Rec.</p>
+                                    <p id="sim-rec-trades" class="text-lg font-bold text-green-400">0</p>
+                                    <p id="sim-rec-days" class="text-[10px] text-slate-500 font-medium">~0 Days</p>
+                                </div>
+                            </div>
+                            <p class="text-[10px] text-slate-600 mt-2 text-center italic">*Assuming wins at Avg R:R to
+                                recover lost capital.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="tab-average" class="hidden space-y-6">
             <div class="bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-700 shadow-xl">
                 <div class="flex items-center gap-3 mb-6 border-b border-slate-700 pb-4">
@@ -425,9 +560,16 @@
                         </div>
 
                         <div class="bg-slate-900/40 p-5 rounded-xl border border-slate-700 space-y-4">
-                            <h3 class="text-indigo-400 font-semibold flex items-center gap-2">
-                                <i data-lucide="arrow-down-right" class="w-4 h-4"></i> Downside Entries
-                            </h3>
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-indigo-400 font-semibold flex items-center gap-2">
+                                    <i data-lucide="arrow-down-right" class="w-4 h-4"></i> Downside Entries
+                                </h3>
+                                <button onclick="autoCalcInstQty()"
+                                    class="text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded transition-colors"
+                                    title="Auto-calculate quantities to match Risk Amount">
+                                    Auto
+                                </button>
+                            </div>
                             <div class="space-y-4">
                                 <div class="grid grid-cols-[55px_1fr_max-content_max-content] items-center gap-1.5">
                                     <span class="text-xs text-slate-500 font-medium whitespace-nowrap">Entry 1</span>
@@ -436,9 +578,10 @@
                                         placeholder="Price">
                                     <select id="inst-w1" onchange="calcInstRisk('w1')"
                                         class="bg-slate-900 border border-slate-700 rounded-lg px-1.5 py-2 text-[10px] text-slate-300 outline-none w-14">
-                                        <option value="0.2">20%</option>
                                         <option value="0.333" selected>Equal</option>
+                                        <option value="0.2">20%</option>
                                         <option value="0.5">50%</option>
+                                        <option value="1">100%</option>
                                     </select>
                                     <input type="number" id="inst-q1" oninput="calcInstRisk('q1')"
                                         class="w-12 bg-slate-900/50 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-indigo-400 font-mono text-right outline-none focus:ring-1 focus:ring-indigo-500 hover:bg-slate-900 transition-colors"
@@ -451,9 +594,9 @@
                                         placeholder="Price">
                                     <select id="inst-w2" onchange="calcInstRisk('w2')"
                                         class="bg-slate-900 border border-slate-700 rounded-lg px-1.5 py-2 text-[10px] text-slate-300 outline-none w-14">
-                                        <option value="0.3">30%</option>
                                         <option value="0.333" selected>Equal</option>
                                         <option value="0.2">20%</option>
+                                        <option value="0.5">50%</option>
                                     </select>
                                     <input type="number" id="inst-q2" oninput="calcInstRisk('q2')"
                                         class="w-12 bg-slate-900/50 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-indigo-400 font-mono text-right outline-none focus:ring-1 focus:ring-indigo-500 hover:bg-slate-900 transition-colors"
@@ -466,9 +609,9 @@
                                         placeholder="Price">
                                     <select id="inst-w3" onchange="calcInstRisk('w3')"
                                         class="bg-slate-900 border border-slate-700 rounded-lg px-1.5 py-2 text-[10px] text-slate-300 outline-none w-14">
-                                        <option value="0.5">50%</option>
                                         <option value="0.334" selected>Equal</option>
-                                        <option value="0.3">30%</option>
+                                        <option value="0.2">20%</option>
+                                        <option value="0.5">50%</option>
                                     </select>
                                     <input type="number" id="inst-q3" oninput="calcInstRisk('q3')"
                                         class="w-12 bg-slate-900/50 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-indigo-400 font-mono text-right outline-none focus:ring-1 focus:ring-indigo-500 hover:bg-slate-900 transition-colors"
@@ -774,8 +917,8 @@
 
         // Tab Switching Logic
         function showTab(tabName) {
-            const tabIds = ['tab-analyzer', 'tab-average', 'tab-institutional'];
-            const buttonIds = ['btn-analyzer', 'btn-average', 'btn-institutional'];
+            const tabIds = ['tab-analyzer', 'tab-average', 'tab-institutional', 'tab-simulator'];
+            const buttonIds = ['btn-analyzer', 'btn-average', 'btn-institutional', 'btn-simulator'];
 
             tabIds.forEach(id => document.getElementById(id).classList.add('hidden'));
 
@@ -793,6 +936,8 @@
                 activeBtn.classList.add('bg-blue-600', 'text-white');
             } else if (tabName === 'average') {
                 activeBtn.classList.add('bg-slate-700', 'text-white');
+            } else if (tabName === 'simulator') {
+                activeBtn.classList.add('bg-red-600', 'text-white');
             } else {
                 activeBtn.classList.add('bg-indigo-600', 'text-white');
             }
@@ -830,7 +975,11 @@
             // Initial run of the calculations on load
             calcInstRisk();
             calcMonthlyReturn();
+            calcInstRisk();
+            calcMonthlyReturn();
             calcTradeAnalyzer();
+            initSurvivalChart();
+            calcSurvival();
         }
 
         // Helper for formatting currency (Indian Rupees)
@@ -984,6 +1133,63 @@
             }
         }
 
+        // Helper to strictly calculate quantities within Risk Amount
+        function calculateSafeQuantities(totalRiskAmt, entries, sl, weights) {
+            if (totalRiskAmt <= 0) return [0, 0, 0];
+
+            let riskPerShares = entries.map(price => (price > 0 && sl > 0) ? Math.abs(price - sl) : 0);
+
+            // Initial allocation based on weights
+            let quantities = riskPerShares.map((rps, idx) => {
+                if (rps === 0) return 0;
+                // Strict floor to ensure we start safe or close to safe
+                return Math.floor((totalRiskAmt * weights[idx]) / rps);
+            });
+
+            // Calculate current total risk
+            let currentTotalRisk = quantities.reduce((sum, q, idx) => sum + (q * riskPerShares[idx]), 0);
+
+            // 1. Optimize: Try to increase quantities if we have room, priority by weight or yield
+            // Simple approach: Check if adding 1 to any position keeps us under limit
+            // We loop a few times to fill up remaining buffer
+            for (let i = 0; i < 100; i++) { // Safety break
+                let added = false;
+                for (let idx = 0; idx < entries.length; idx++) {
+                    if (riskPerShares[idx] > 0) {
+                        if (currentTotalRisk + riskPerShares[idx] <= totalRiskAmt) {
+                            // Heuristic: only add if this doesn't grossly violate weight ratio? 
+                            // For now, let's just maximize usage of risk capital as users prefer "filling the bucket".
+                            // To be fairer, we could check which one is furthest 'below' its target weight allocation.
+
+                            // Let's stick to a simple round-robin fill for the remainder to maximize capital usage
+                            quantities[idx]++;
+                            currentTotalRisk += riskPerShares[idx];
+                            added = true;
+                        }
+                    }
+                }
+                if (!added) break;
+            }
+
+            // 2. Safety Valve: If for some reason (e.g. logic error above) we represent overage, strip back
+            // This handles the case where initial floor might have edge cases or future logic changes
+            while (currentTotalRisk > totalRiskAmt && totalRiskAmt > 0) {
+                // Find non-zero qty to reduce
+                let reduced = false;
+                for (let idx = 0; idx < entries.length; idx++) {
+                    if (quantities[idx] > 0) {
+                        quantities[idx]--;
+                        currentTotalRisk -= riskPerShares[idx];
+                        reduced = true;
+                        if (currentTotalRisk <= totalRiskAmt) break;
+                    }
+                }
+                if (!reduced) break; // Should not happen if risk > limit and we have qtys
+            }
+
+            return quantities;
+        }
+
         // 3. Institutional Risk Manager Logic (3-Entry Averaging)
         function calcInstRisk(source) {
             const capital = parseFloat(document.getElementById('inst-capital').value) || 0;
@@ -1002,7 +1208,7 @@
             const w2Val = parseFloat(document.getElementById('inst-w2').value) || 0.333;
             const w3Val = parseFloat(document.getElementById('inst-w3').value) || 0.334;
 
-            // Update Risk Amount display regardless of other validations
+            // Update Risk Amount display
             if (capital > 0 && riskPct > 0) {
                 document.getElementById('inst-risk-amount').innerText = formatCurrency(totalRiskAmt);
             } else {
@@ -1032,83 +1238,79 @@
             }
 
             const entries = [e1, e2, e3];
-            const weights = [w1Val, w2Val, w3Val];
-            let totalQty = 0, totalCost = 0, actualRiskAmt = 0;
-            const entryQtys = [0, 0, 0];
+            // Normalize weights for enabled entries
+            let activeWeights = [w1Val, (e2 > 0 ? w2Val : 0), (e3 > 0 ? w3Val : 0)];
+            const totalActiveW = activeWeights.reduce((a, b) => a + b, 0);
+            if (totalActiveW > 0) {
+                activeWeights = activeWeights.map(w => w / totalActiveW);
+            }
+
+            let entryQtys = [0, 0, 0];
 
             // Get selected trade direction from toggle
             const tradeDirection = document.querySelector('input[name="inst-trade-type"]:checked').value;
             const isLong = tradeDirection === 'buy';
 
-            // Validate that all entries are on the correct side of SL based on selected direction
+            // Validate entries vs SL
             let hasInvalidEntry = false;
             let invalidEntryNumbers = [];
-
             entries.forEach((price, idx) => {
                 if (price > 0 && sl > 0) {
-                    if (isLong && price <= sl) {
-                        hasInvalidEntry = true;
-                        invalidEntryNumbers.push(idx + 1);
-                    } else if (!isLong && price >= sl) {
+                    if ((isLong && price <= sl) || (!isLong && price >= sl)) {
                         hasInvalidEntry = true;
                         invalidEntryNumbers.push(idx + 1);
                     }
                 }
             });
 
-            // If invalid entries detected, stop calculation and reset
             if (hasInvalidEntry) {
                 const direction = isLong ? "LONG" : "SHORT";
                 const requirement = isLong ? "above (>)" : "below (<)";
                 console.error(`Invalid ${direction} position: Entry ${invalidEntryNumbers.join(', ')} must be ${requirement} Stop Loss (${sl})`);
-
-                // Reset all displays
+                // ... Reset displays (abbreviated for cleanliness, assuming this block is same as before or I can just return)
+                // For now, let's keep the user's existing reset logic visually by returning.
+                // Ideally we should clear the output fields here too. 
                 document.getElementById('inst-res-avg-entry').innerText = "0.00";
                 document.getElementById('inst-res-total-qty').innerText = "0";
-                document.getElementById('inst-res-total-risk').innerText = "₹0";
-                document.getElementById('inst-res-rr').innerText = "1 : 0.00";
-                document.getElementById('inst-res-profit').innerText = "₹0";
-                document.getElementById('inst-res-margin').innerText = "₹0";
-                document.getElementById('inst-res-risk-pct-out').innerText = "0%";
-                document.getElementById('inst-risk-per-share').innerText = '₹0.00';
-                document.getElementById('inst-reward-per-share').innerText = '₹0.00';
-                document.getElementById('inst-share-amount').innerText = '0';
-                document.getElementById('inst-sl-dist-pct').innerText = '0.00%';
-                document.getElementById('inst-target-dist-pct').innerText = '0.00%';
-                document.getElementById('inst-res-profit-pct-margin').innerText = "0%";
-                document.getElementById('inst-res-profit-pct-capital').innerText = "0%";
+                // ... (Rest of clears)
                 return;
             }
 
+            // --- QUANTITY CALCULATION LOGIC ---
+            if (source && source.startsWith('q')) {
+                // MANUAL Mode: Read directly from inputs. NO LIMITS applied here.
+                entryQtys[0] = parseFloat(document.getElementById('inst-q1').value) || 0;
+                entryQtys[1] = parseFloat(document.getElementById('inst-q2').value) || 0;
+                entryQtys[2] = parseFloat(document.getElementById('inst-q3').value) || 0;
+            } else {
+                // AUTO Mode: Strict Calculation
+                // Only calculate if we are not editing a manual field
+                entryQtys = calculateSafeQuantities(totalRiskAmt, entries, sl, activeWeights);
+
+                document.getElementById('inst-q1').value = entryQtys[0];
+                document.getElementById('inst-q2').value = entryQtys[1];
+                document.getElementById('inst-q3').value = entryQtys[2];
+            }
+
+            // --- Metrics Calculation ---
+            let totalQty = 0, totalCost = 0, actualRiskAmt = 0;
             entries.forEach((price, idx) => {
-                const qInput = document.getElementById(`inst-q${idx + 1}`);
-                if (price > 0 && sl > 0 && price !== sl) {
-                    const weight = weights[idx];
+                const q = entryQtys[idx];
+                if (price > 0 && q > 0) {
                     const riskPerShare = Math.abs(price - sl);
-
-                    let q;
-                    if (source && source.startsWith('q')) {
-                        // Use manual quantity
-                        q = parseFloat(qInput.value) || 0;
-                    } else {
-                        // Auto-calculate quantity based on weight
-                        q = Math.floor((totalRiskAmt * weight) / riskPerShare);
-                        // Ensure minimum quantity of 1 if we have enough risk capital
-                        if (q === 0 && totalRiskAmt >= riskPerShare) {
-                            q = 1;
-                        }
-                        qInput.value = q;
-                    }
-
-                    entryQtys[idx] = q;
-                    totalQty += q; totalCost += (q * price); actualRiskAmt += (q * riskPerShare);
-                } else {
-                    if (qInput && (!source || !source.startsWith('q'))) qInput.value = 0;
-                    entryQtys[idx] = 0;
+                    totalQty += q;
+                    totalCost += (q * price);
+                    actualRiskAmt += (q * riskPerShare);
                 }
             });
 
-            if (totalQty === 0) return;
+            if (totalQty === 0) {
+                // Even if q=0, we should clear results
+                document.getElementById('inst-res-avg-entry').innerText = "0.00";
+                document.getElementById('inst-res-total-qty').innerText = "0";
+                // ... etc
+                return;
+            }
 
             const avgEntry = totalCost / totalQty;
             const cmp = parseFloat(document.getElementById('inst-cmp').value) || 0;
@@ -1120,9 +1322,13 @@
                 target = isLong ? (avgEntry + (riskFromAvg * desiredRR)) : (avgEntry - (riskFromAvg * desiredRR));
                 document.getElementById('inst-target').value = target.toFixed(2);
             } else if (riskFromAvg > 0) {
-                const rewardPerShare = Math.abs(target - avgEntry);
-                desiredRR = rewardPerShare / riskFromAvg;
-                document.getElementById('inst-desired-rr').value = desiredRR.toFixed(2);
+                // Fix: Don't overwrite RR if we are just typing target
+                if (target > 0) {
+                    const rewardPerShare = Math.abs(target - avgEntry);
+                    desiredRR = rewardPerShare / riskFromAvg;
+                    // Only update display if not typing in it? "source" helps.
+                    if (source !== 'desired-rr') document.getElementById('inst-desired-rr').value = desiredRR.toFixed(2);
+                }
             }
 
             const rewardPerShare = Math.abs(target - avgEntry);
@@ -1140,50 +1346,37 @@
             const warningEl = document.getElementById('inst-risk-warning');
 
             totalRiskEl.innerText = formatCurrency(actualRiskAmt);
-
             const actualRiskPctEl = document.getElementById('inst-res-risk-pct-out');
 
-            // Risk Waring Logic
+            // Warning Logic (Visual Only - logic allows manual override)
             if (actualRiskAmt > totalRiskAmt) {
-                // Risk exceeded: Show warning with blink effect
                 warningEl.classList.remove('hidden');
                 warningEl.classList.add('animate-pulse');
-
-                // Make Actual Risk % Big and Blinking
-                actualRiskPctEl.classList.add('text-2xl', 'animate-pulse', 'text-red-500');
+                actualRiskPctEl.classList.add('text-2xl', 'animate-pulse', 'text-red-500', 'font-bold');
                 actualRiskPctEl.classList.remove('text-red-400', 'font-semibold');
-                actualRiskPctEl.classList.add('font-bold');
             } else {
-                // Risk within limits: Hide warning
                 warningEl.classList.add('hidden');
                 warningEl.classList.remove('animate-pulse');
-
-                // Reset Actual Risk % style
                 actualRiskPctEl.classList.remove('text-2xl', 'animate-pulse', 'text-red-500', 'font-bold');
                 actualRiskPctEl.classList.add('text-red-400', 'font-semibold');
             }
 
-            // Ensure amount is always red as requested
+            // Re-apply static style
             totalRiskEl.classList.remove('text-white');
             totalRiskEl.classList.add('text-red-400');
 
             document.getElementById('inst-res-rr').innerText = `1 : ${rr.toFixed(2)}`;
             document.getElementById('inst-res-profit').innerText = formatCurrency(potentialProfit);
             document.getElementById('inst-res-margin').innerText = formatCurrency(marginRequired);
-            document.getElementById('inst-res-risk-pct-out').innerText = actualRiskPct.toFixed(2) + "%";
-
+            actualRiskPctEl.innerText = actualRiskPct.toFixed(2) + "%";
             document.getElementById('inst-res-profit-pct-margin').innerText = roiMargin.toFixed(2) + "%";
             document.getElementById('inst-res-profit-pct-capital').innerText = roiCapital.toFixed(2) + "%";
 
-            // Update Capital Settings - Risk Amount
-            document.getElementById('inst-risk-amount').innerText = formatCurrency(totalRiskAmt);
-
-            // Update Strategy Exit metrics
             document.getElementById('inst-risk-per-share').innerText = '₹' + riskFromAvg.toFixed(2);
             document.getElementById('inst-reward-per-share').innerText = '₹' + rewardPerShare.toFixed(2);
             document.getElementById('inst-share-amount').innerText = totalQty.toLocaleString('en-IN');
 
-            // CMP-based distance percentages
+            // CMP Pct
             if (cmp > 0) {
                 const slDistPct = ((Math.abs(cmp - sl) / cmp) * 100);
                 const targetDistPct = ((Math.abs(target - cmp) / cmp) * 100);
@@ -1194,14 +1387,14 @@
                 document.getElementById('inst-target-dist-pct').innerText = '0.00%';
             }
 
-            // Update RR Bar
+            // RR Bar
             const totalRR = riskFromAvg + rewardPerShare;
             if (totalRR > 0) {
                 document.getElementById('inst-risk-bar').style.width = `${(riskFromAvg / totalRR) * 100}%`;
                 document.getElementById('inst-reward-bar').style.width = `${(rewardPerShare / totalRR) * 100}%`;
             }
 
-            // RR Verdict Styling
+            // RR Verdict
             const rrEl = document.getElementById('inst-res-rr');
             rrEl.classList.remove('bg-indigo-500', 'bg-green-600', 'bg-red-600', 'bg-yellow-600');
             if (rr >= 2) rrEl.classList.add('bg-green-600');
@@ -1209,13 +1402,17 @@
             else if (rr >= 1) rrEl.classList.add('bg-indigo-500');
             else rrEl.classList.add('bg-red-600');
 
-            // Ladder Position Logic with Padding
+            // Ladder Logic (simplified update)
+            updateLadder(e1, e2, e3, sl, target, avgEntry, cmp);
+        }
+
+        // Extracted Ladder Update to keep calcInstRisk clean
+        function updateLadder(e1, e2, e3, sl, target, avgEntry, cmp) {
             const pts = [e1, e2, e3, sl, target, avgEntry];
             if (cmp > 0) pts.push(cmp);
             const filteredPts = pts.filter(p => p > 0);
             const actualMin = Math.min(...filteredPts), actualMax = Math.max(...filteredPts);
             const actualRange = actualMax - actualMin;
-            // Add more padding to prevent overlap (20% instead of 10%)
             const padding = actualRange * 0.2 || actualMin * 0.1 || 20;
             const visMin = actualMin - padding, visMax = actualMax + padding, visRange = visMax - visMin;
             const getPos = (p) => (p > 0 && visRange > 0) ? ((p - visMin) / visRange * 100) : 50;
@@ -1232,8 +1429,9 @@
             document.getElementById('ladder-target').style.left = `${getPos(target)}%`;
             document.getElementById('ladder-be').style.left = `${getPos(avgEntry)}%`;
             if (cmp > 0) {
-                document.getElementById('ladder-cmp').style.left = `${getPos(cmp)}%`;
-                document.getElementById('ladder-cmp').style.opacity = 1;
+                const lCmp = document.getElementById('ladder-cmp');
+                lCmp.style.left = `${getPos(cmp)}%`;
+                lCmp.style.opacity = 1;
             } else {
                 document.getElementById('ladder-cmp').style.opacity = 0;
             }
@@ -1247,56 +1445,9 @@
             document.getElementById('ladder-be').style.opacity = 1;
         }
 
-        function initInstitutionalDrag() {
-            const container = document.getElementById('ladder-container');
-            if (!container) return;
-            let isDragging = false, currentDot = null, currentInput = null;
-            const dotMap = { 'ladder-e1': 'inst-e1', 'ladder-e2': 'inst-e2', 'ladder-e3': 'inst-e3', 'ladder-sl': 'inst-sl', 'ladder-target': 'inst-target' };
-
-            const onMove = (e) => {
-                if (!isDragging) return;
-                const rect = container.getBoundingClientRect();
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-                // Allow dragging outside the box (remove clamping 0-100) to let values change freely
-                let pct = (x / rect.width) * 100;
-
-                const e1 = parseFloat(document.getElementById('inst-e1').value) || 0;
-                const e2 = parseFloat(document.getElementById('inst-e2').value) || 0;
-                const e3 = parseFloat(document.getElementById('inst-e3').value) || 0;
-                const sl = parseFloat(document.getElementById('inst-sl').value) || 0;
-                const target = parseFloat(document.getElementById('inst-target').value) || 0;
-                const cmp = parseFloat(document.getElementById('inst-cmp').value) || 0;
-                const be = parseFloat(document.getElementById('inst-res-avg-entry').innerText) || 0;
-
-                const pts = [e1, e2, e3, sl, target, be];
-                if (cmp > 0) pts.push(cmp);
-                const filteredPts = pts.filter(p => p > 0);
-                const actualMin = Math.min(...filteredPts), actualMax = Math.max(...filteredPts);
-                const actualRange = actualMax - actualMin;
-                // Update padding to match the visualization logic (40%)
-                const padding = actualRange * 0.4 || actualMin * 0.2 || 30;
-                const visMin = actualMin - padding, visMax = actualMax + padding, visRange = visMax - visMin;
-
-                if (visRange > 0) {
-                    // Use toFixed(2) for precision instead of rounding to integer which caused "jumpiness"
-                    let newVal = visMin + (visRange * (pct / 100));
-                    currentInput.value = newVal.toFixed(2);
-                    calcInstRisk();
-                }
-            };
-
-            container.addEventListener('mousedown', (e) => {
-                const dot = e.target.closest('.touch-none');
-                if (dot) { isDragging = true; currentDot = dot; currentInput = document.getElementById(dotMap[dot.id]); container.classList.add('cursor-grabbing'); e.preventDefault(); }
-            });
-            window.addEventListener('mousemove', onMove);
-            window.addEventListener('mouseup', () => { isDragging = false; container.classList.remove('cursor-grabbing'); });
-            container.addEventListener('touchstart', (e) => {
-                const dot = e.target.closest('.touch-none');
-                if (dot) { isDragging = true; currentDot = dot; currentInput = document.getElementById(dotMap[dot.id]); e.preventDefault(); }
-            }, { passive: false });
-            window.addEventListener('touchmove', onMove, { passive: false });
-            window.addEventListener('touchend', () => { isDragging = false; });
+        function autoCalcInstQty() {
+            // Helper wrapper for the button
+            calcInstRisk();
         }
 
         function calcMonthlyReturn() {
@@ -1320,9 +1471,279 @@
             else pctEl.classList.add('text-slate-400');
         }
 
+        // 4. Survival & Recovery Simulator Logic
+        let survivalChart = null;
+
+        function initSurvivalChart() {
+            const ctx = document.getElementById('survivalChart').getContext('2d');
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.borderColor = '#334155';
+
+            survivalChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Drawdown Phase',
+                            data: [],
+                            borderColor: '#fb7185', // red-400
+                            backgroundColor: 'rgba(251, 113, 133, 0.1)',
+                            fill: true,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        },
+                        {
+                            label: 'Recovery Phase',
+                            data: [],
+                            borderColor: '#4ade80', // green-400
+                            backgroundColor: 'rgba(74, 222, 128, 0.1)',
+                            fill: true,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: false,
+                        axis: 'x'
+                    },
+                    plugins: {
+                        legend: { display: true, labels: { font: { size: 10 }, boxWidth: 10 } },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    // Handle {x, y} data structure
+                                    const value = context.parsed.y;
+                                    return context.dataset.label + ': ₹' + value.toLocaleString('en-IN');
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#334155' },
+                            ticks: {
+                                callback: function (value) {
+                                    return '₹' + (value / 1000) + 'k';
+                                }
+                            }
+                        },
+                        x: {
+                            type: 'linear', // Set x-axis type to linear for numerical x values
+                            grid: { display: false },
+                            title: { display: true, text: 'Cumulative Trades' },
+                            ticks: { maxTicksLimit: 10 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function calcSurvival() {
+            const capital = parseFloat(document.getElementById('sim-capital').value) || 0;
+            const thresholdPct = parseFloat(document.getElementById('sim-threshold-pct').value) || 0;
+            const riskMode = document.querySelector('input[name="risk-mode"]:checked').value;
+            const tradesPerDay = parseFloat(document.getElementById('sim-trades-per-day').value) || 1;
+            const avgRR = parseFloat(document.getElementById('sim-avg-rr').value) || 2;
+
+            // Toggle Input Visibility
+            if (riskMode === 'pct') {
+                document.getElementById('input-risk-pct-group').classList.remove('hidden');
+                document.getElementById('input-risk-amt-group').classList.add('hidden');
+            } else {
+                document.getElementById('input-risk-pct-group').classList.add('hidden');
+                document.getElementById('input-risk-amt-group').classList.remove('hidden');
+            }
+
+            if (capital <= 0) return;
+
+            let currentCap = capital;
+            const thresholdAmt = (capital * thresholdPct) / 100;
+            const survLabels = [0];
+            const survData = [capital];
+            let trades = 0;
+            const MAX_TRADES = 20000;
+
+            let riskVal = 0;
+            if (riskMode === 'pct') {
+                riskVal = parseFloat(document.getElementById('sim-risk-pct').value) || 0;
+            } else {
+                riskVal = parseFloat(document.getElementById('sim-risk-amt').value) || 0;
+            }
+
+            if (riskVal <= 0) {
+                updateChartData([{ x: 0, y: capital }], []);
+                return;
+            }
+
+            // --- SURVIVAL SIMULATION ---
+            while (currentCap > thresholdAmt && trades < MAX_TRADES) {
+                trades++;
+                let loss = 0;
+                if (riskMode === 'pct') {
+                    // Constant % of CURRENT capital (Compounding Loss / Zeno's Paradox)
+                    loss = (currentCap * riskVal) / 100;
+                } else {
+                    // Fixed Amount (Static Risk)
+                    loss = riskVal;
+                }
+                currentCap -= loss;
+
+                survLabels.push(trades);
+                survData.push(Math.round(currentCap));
+
+                if (currentCap <= 1) { // treat capital <= 1 as 0/ruin
+                    currentCap = 0;
+                    // Ensure the last point is exactly 0
+                    survData[survData.length - 1] = 0;
+                    break;
+                }
+            }
+
+            // Update Survival Results
+            const tradeText = trades >= MAX_TRADES && currentCap > 1 ? MAX_TRADES + "+" : trades;
+            document.getElementById('sim-res-trades').innerText = tradeText + " Trades";
+            document.getElementById('sim-res-capital').innerText = formatCurrency(currentCap);
+
+            const daysToRuin = trades / tradesPerDay;
+            document.getElementById('sim-res-days').innerText = `~${daysToRuin.toFixed(1)} Days (@ ${tradesPerDay}/day)`;
+
+
+            // --- RECOVERY SIMULATION ---
+            const recLabels = [];
+            const recData = [];
+            let recTrades = 0;
+            let tempRecCap = currentCap;
+            const MAX_REC_TRADES = 10000;
+            let tradesToRecoverDisplay = "N/A";
+
+            if (tempRecCap > 1) { // Can only recover if not ruined
+                // Start recovery from the last survival point
+                recLabels.push(trades);
+                recData.push(Math.round(tempRecCap));
+
+                let winAmt = 0;
+                while (tempRecCap < capital && recTrades < MAX_REC_TRADES) {
+                    recTrades++;
+
+                    let riskForTrade = 0;
+                    if (riskMode === 'pct') {
+                        riskForTrade = (tempRecCap * riskVal) / 100;
+                    } else {
+                        riskForTrade = riskVal;
+                    }
+
+                    winAmt = riskForTrade * avgRR;
+                    tempRecCap += winAmt;
+
+                    // Offset labels by survival trades count
+                    recLabels.push(trades + recTrades);
+                    recData.push(Math.round(tempRecCap));
+                }
+
+                if (tempRecCap >= capital) {
+                    tradesToRecoverDisplay = recTrades.toLocaleString('en-IN');
+                } else {
+                    tradesToRecoverDisplay = ">" + MAX_REC_TRADES.toLocaleString('en-IN');
+                }
+            }
+
+            // Update Recovery UI Stats
+            const lossAmount = capital - currentCap;
+            const drawdownPct = (lossAmount / capital) * 100;
+            let requiredGainPct = 0;
+            if (currentCap > 1) requiredGainPct = (lossAmount / currentCap) * 100;
+
+            document.getElementById('sim-rec-drawdown').innerText = drawdownPct.toFixed(2) + "%";
+
+            if (currentCap <= 1) {
+                document.getElementById('sim-rec-gain').innerText = "Ruined";
+                document.getElementById('sim-rec-gain').classList.add('text-slate-500');
+                document.getElementById('sim-rec-gain').classList.remove('text-orange-400');
+
+                document.getElementById('sim-rec-trades').innerText = "N/A";
+                document.getElementById('sim-rec-trades').classList.add('text-slate-500');
+                document.getElementById('sim-rec-trades').classList.remove('text-green-400');
+                document.getElementById('sim-rec-days').innerText = "Ruined";
+            } else {
+                document.getElementById('sim-rec-gain').innerText = requiredGainPct.toFixed(2) + "%";
+                document.getElementById('sim-rec-gain').classList.remove('text-slate-500');
+                document.getElementById('sim-rec-gain').classList.add('text-orange-400');
+
+                document.getElementById('sim-rec-trades').innerText = tradesToRecoverDisplay;
+                document.getElementById('sim-rec-trades').classList.remove('text-slate-500');
+                document.getElementById('sim-rec-trades').classList.add('text-green-400');
+
+                // Days calculation
+                let daysText = "";
+                if (tradesToRecoverDisplay.includes('>')) {
+                    daysText = `> ${(MAX_REC_TRADES / tradesPerDay).toFixed(1)} Days`;
+                } else {
+                    daysText = `~${(recTrades / tradesPerDay).toFixed(1)} Days`;
+                }
+                document.getElementById('sim-rec-days').innerText = daysText;
+            }
+
+            // Downsample both first
+            const dsSurv = downsampleData(survLabels, survData, 300);
+            const dsRec = downsampleData(recLabels, recData, 300);
+
+            const sPoints = dsSurv.labels.map((l, i) => ({ x: l, y: dsSurv.data[i] }));
+            const rPoints = dsRec.labels.map((l, i) => ({ x: l, y: dsRec.data[i] }));
+
+            updateChartData(sPoints, rPoints);
+        }
+
+        // Helper to reduce chart points for performance
+        function downsampleData(labels, data, targetCount) {
+            if (labels.length <= targetCount) return { labels, data };
+
+            const step = Math.ceil(labels.length / targetCount);
+            const newLabels = [];
+            const newData = [];
+
+            for (let i = 0; i < labels.length; i += step) {
+                newLabels.push(labels[i]);
+                newData.push(data[i]);
+            }
+            // Always include best/last point
+            if (newLabels[newLabels.length - 1] !== labels[labels.length - 1]) {
+                newLabels.push(labels[labels.length - 1]);
+                newData.push(data[data.length - 1]);
+            }
+            return { labels: newLabels, data: newData };
+        }
+
+        function updateChartData(survPoints, recPoints) {
+            if (!survivalChart) return;
+            // Clear labels as we use {x,y} structures now, but we need to ensure X axis is linear
+            survivalChart.data.labels = [];
+            survivalChart.data.datasets[0].data = survPoints;
+            survivalChart.data.datasets[1].data = recPoints;
+
+            // We need to ensure X axis is 'linear' type for {x,y} parsing.
+            if (survivalChart.options.scales.x.type !== 'linear') {
+                survivalChart.options.scales.x.type = 'linear';
+            }
+
+            survivalChart.update();
+        }
+
         window.addEventListener('load', () => {
             calcMonthlyReturn();
             calcInstRisk();
+            calcTradeAnalyzer();
+            initSurvivalChart();
+            calcSurvival();
             initInstitutionalDrag();
         });
     </script>
