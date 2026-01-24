@@ -773,7 +773,8 @@
                 document.getElementById('inst-risk-amount').innerText = formatCurrency(0);
             }
 
-            if (capital <= 0 || riskPct <= 0 || e1 <= 0 || sl <= 0 || e1 === sl) {
+            const hasEntry = e1 > 0 || e2 > 0 || e3 > 0;
+            if (capital <= 0 || riskPct <= 0 || !hasEntry || sl <= 0) {
                 ["inst-res-avg-entry", "inst-res-total-qty", "inst-res-rr"].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.innerText = id === "inst-res-rr" ? "1 : 0.00" : "0";
@@ -786,12 +787,16 @@
                 document.getElementById('inst-reward-per-share').innerText = '₹0.00';
                 document.getElementById('inst-share-amount').innerText = '0';
                 document.getElementById('inst-sl-dist-pct').innerText = '0.00%';
-                document.getElementById('inst-target-dist-pct').innerText = '0.00%';
-                if (!source || !source.startsWith('q')) {
-                    document.getElementById('inst-q1').value = "0";
-                    document.getElementById('inst-q2').value = "0";
-                    document.getElementById('inst-q3').value = "0";
+
+                // Only clear if absolutely necessary (e.g. source is not a quantity input)
+                if (source === 'reset') {
+                    document.getElementById('inst-q1').value = "";
+                    document.getElementById('inst-q2').value = "";
+                    document.getElementById('inst-q3').value = "";
                 }
+
+                const noAvg = 0;
+                updateLadder(e1, e2, e3, sl, target, noAvg, 0);
                 return;
             }
 
@@ -850,12 +855,12 @@
                 const direction = isLong ? "LONG" : "SHORT";
                 const requirement = isLong ? "above (>)" : "below (<)";
                 console.error(`Invalid ${direction} position: Entry ${invalidEntryNumbers.join(', ')} must be ${requirement} Stop Loss (${sl})`);
-                // ... Reset displays (abbreviated for cleanliness, assuming this block is same as before or I can just return)
-                // For now, let's keep the user's existing reset logic visually by returning.
-                // Ideally we should clear the output fields here too. 
+                // ... Reset displays
                 document.getElementById('inst-res-avg-entry').innerText = "0.00";
                 document.getElementById('inst-res-total-qty').innerText = "0";
-                // ... (Rest of clears)
+
+                // Still update ladder so dots are visible and draggable
+                updateLadder(e1, e2, e3, sl, target, 0, 0);
                 return;
             }
 
@@ -869,9 +874,9 @@
                 // AUTO Mode: Use the finalWeights (intelligent distribution)
                 entryQtys = calculateSafeQuantities(totalRiskAmt, entries, sl, finalWeights);
 
-                document.getElementById('inst-q1').value = entryQtys[0];
-                document.getElementById('inst-q2').value = entryQtys[1];
-                document.getElementById('inst-q3').value = entryQtys[2];
+                document.getElementById('inst-q1').value = e1 > 0 ? entryQtys[0] : (hasEntry ? "0" : "");
+                document.getElementById('inst-q2').value = e2 > 0 ? entryQtys[1] : (hasEntry ? "0" : "");
+                document.getElementById('inst-q3').value = e3 > 0 ? entryQtys[2] : (hasEntry ? "0" : "");
             }
 
             // --- Metrics Calculation ---
@@ -993,18 +998,23 @@
             const pts = [e1, e2, e3, sl, target, avgEntry];
             if (cmp > 0) pts.push(cmp);
             const filteredPts = pts.filter(p => p > 0);
-            const actualMin = Math.min(...filteredPts), actualMax = Math.max(...filteredPts);
+            if (filteredPts.length === 0) return;
+
+            const actualMin = Math.min(...filteredPts);
+            const actualMax = Math.max(...filteredPts);
             const actualRange = actualMax - actualMin;
-            const padding = actualRange * 0.2 || actualMin * 0.1 || 20;
-            const visMin = actualMin - padding, visMax = actualMax + padding, visRange = visMax - visMin;
+            const padding = actualRange * 0.2 || (actualMin > 0 ? actualMin * 0.1 : 20);
+            const visMin = actualMin - padding;
+            const visMax = actualMax + padding;
+            const visRange = visMax - visMin;
             const getPos = (p) => (p > 0 && visRange > 0) ? ((p - visMin) / visRange * 100) : 50;
 
-            document.getElementById('lbl-e1').innerText = `₹${e1}`;
+            document.getElementById('lbl-e1').innerText = e1 > 0 ? `₹${e1}` : '-';
             document.getElementById('lbl-e2').innerText = e2 > 0 ? `₹${e2}` : '-';
             document.getElementById('lbl-e3').innerText = e3 > 0 ? `₹${e3}` : '-';
-            document.getElementById('lbl-sl').innerText = `₹${sl}`;
-            document.getElementById('lbl-target').innerText = `₹${target}`;
-            document.getElementById('lbl-be').innerText = `₹${avgEntry.toFixed(2)}`;
+            document.getElementById('lbl-sl').innerText = sl > 0 ? `₹${sl}` : '-';
+            document.getElementById('lbl-target').innerText = target > 0 ? `₹${target}` : '-';
+            document.getElementById('lbl-be').innerText = avgEntry > 0 ? `₹${avgEntry.toFixed(2)}` : '-';
             document.getElementById('lbl-cmp').innerText = cmp > 0 ? `₹${cmp}` : '-';
 
             document.getElementById('ladder-sl').style.left = `${getPos(sl)}%`;
@@ -1020,11 +1030,87 @@
 
             if (e3 > 0) document.getElementById('ladder-e3').style.left = `${getPos(e3)}%`;
             if (e2 > 0) document.getElementById('ladder-e2').style.left = `${getPos(e2)}%`;
-            document.getElementById('ladder-e1').style.left = `${getPos(e1)}%`;
+            if (e1 > 0) document.getElementById('ladder-e1').style.left = `${getPos(e1)}%`;
 
+            document.getElementById('ladder-e1').style.opacity = e1 > 0 ? 1 : 0;
             document.getElementById('ladder-e2').style.opacity = e2 > 0 ? 1 : 0;
             document.getElementById('ladder-e3').style.opacity = e3 > 0 ? 1 : 0;
             document.getElementById('ladder-be').style.opacity = 1;
+
+            // Store current scale for dragging
+            window.ladderScale = { visMin, visRange };
+        }
+
+        // Implementation of dragging for Institutional Markers
+        function initInstitutionalDrag() {
+            const container = document.getElementById('ladder-container');
+            let activeMarker = null;
+
+            const markers = {
+                'ladder-sl': 'inst-sl',
+                'ladder-e1': 'inst-e1',
+                'ladder-e2': 'inst-e2',
+                'ladder-e3': 'inst-e3',
+                'ladder-target': 'inst-target'
+            };
+
+            const startDrag = (e, markerId) => {
+                activeMarker = markerId;
+                console.log('Drag started:', markerId);
+                document.body.style.cursor = 'ew-resize';
+                e.preventDefault();
+            };
+
+            Object.keys(markers).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('mousedown', (e) => startDrag(e, id));
+                    el.addEventListener('touchstart', (e) => startDrag(e, id), { passive: false });
+                }
+            });
+
+            const onMove = (e) => {
+                if (!activeMarker || !window.ladderScale) return;
+
+                const rect = container.getBoundingClientRect();
+                const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+
+                // Ensure we are using the correct relative coordinate
+                let pct = (clientX - rect.left) / rect.width;
+                pct = Math.max(0, Math.min(1, pct));
+
+                const { visMin, visRange } = window.ladderScale;
+                if (isNaN(visMin) || isNaN(visRange) || visRange <= 0) return;
+
+                const newPrice = visMin + (pct * visRange);
+                console.log('Moving:', activeMarker, 'pct:', pct.toFixed(2), 'price:', newPrice.toFixed(2));
+
+                const inputId = markers[activeMarker];
+                const input = document.getElementById(inputId);
+                if (input) {
+                    input.value = newPrice.toFixed(2);
+                    // Filter source for calcInstRisk
+                    let source = '';
+                    if (inputId === 'inst-sl') source = 'sl';
+                    else if (inputId === 'inst-target') source = 'target';
+                    else source = inputId.replace('inst-', '');
+
+                    calcInstRisk(source);
+                }
+            };
+
+            const stopDrag = () => {
+                if (activeMarker) {
+                    console.log('Drag stopped:', activeMarker);
+                    activeMarker = null;
+                    document.body.style.cursor = 'default';
+                }
+            };
+
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('touchmove', onMove, { passive: false });
+            window.addEventListener('mouseup', stopDrag);
+            window.addEventListener('touchend', stopDrag);
         }
 
         function autoCalcInstQty() {
@@ -1065,13 +1151,20 @@
                 const marginRequired = totalCost / leverage;
                 document.getElementById('inst-res-margin').innerText = formatCurrency(marginRequired);
 
-                // Clear other risk-dependent metrics to avoid confusion
-                document.getElementById('inst-res-total-risk').innerText = "₹0";
-                document.getElementById('inst-res-rr').innerText = "1 : 0.00";
-                document.getElementById('inst-res-risk-pct-out').innerText = "0%";
-
-                // Try to update ladder if possible (it might look weird without SL/Target but good for visual reference of entries)
+                // Update result fields
+                const riskPct = parseFloat(document.getElementById('inst-risk-pct').value) || 0;
+                const capital = parseFloat(document.getElementById('inst-capital').value) || 0;
+                const totalRiskAmt = (capital * riskPct) / 100;
                 const sl = parseFloat(document.getElementById('inst-sl').value) || 0;
+
+                let actualRiskAmt = 0;
+                if (sl > 0) {
+                    actualRiskAmt = Math.abs(avgEntry - sl) * totalQty;
+                    document.getElementById('inst-res-total-risk').innerText = formatCurrency(actualRiskAmt);
+                    document.getElementById('inst-res-risk-pct-out').innerText = ((actualRiskAmt / capital) * 100 || 0).toFixed(2) + "%";
+                }
+
+                // Try to update ladder
                 const target = parseFloat(document.getElementById('inst-target').value) || 0;
                 const cmp = parseFloat(document.getElementById('inst-cmp').value) || 0;
                 updateLadder(e1, e2, e3, sl, target, avgEntry, cmp);
@@ -1369,7 +1462,6 @@
         window.addEventListener('load', () => {
             calcMonthlyReturn();
             calcInstRisk();
-            calcTradeAnalyzer();
             initSurvivalChart();
             calcSurvival();
             initInstitutionalDrag();
