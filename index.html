@@ -698,8 +698,8 @@
 
 
 
-        // Helper to strictly calculate quantities within Risk Amount
-        function calculateSafeQuantities(totalRiskAmt, entries, sl, weights) {
+        // Helper to strictly calculate quantities within Risk Amount AND Margin Limit
+        function calculateSafeQuantities(totalRiskAmt, entries, sl, weights, maxCapital) {
             if (totalRiskAmt <= 0) return [0, 0, 0];
 
             let riskPerShares = entries.map(price => (price > 0 && sl > 0) ? Math.abs(price - sl) : 0);
@@ -711,40 +711,65 @@
             });
 
             let currentTotalRisk = quantities.reduce((sum, q, idx) => sum + (q * riskPerShares[idx]), 0);
+            let currentTotalCost = quantities.reduce((sum, q, idx) => sum + (q * entries[idx]), 0);
 
-            // Optimization loop: Fill remaining risk up to entry-specific target risk
-            for (let i = 0; i < 100; i++) {
-                let added = false;
-                for (let idx = 0; idx < entries.length; idx++) {
-                    const rps = riskPerShares[idx];
-                    if (rps > 0) {
-                        const targetRiskForEntry = totalRiskAmt * weights[idx];
-                        const currentRiskForEntry = quantities[idx] * rps;
-
-                        // Strict respect for both total limit and individual target weight
-                        if (currentTotalRisk + rps <= totalRiskAmt + 0.01 && currentRiskForEntry + rps <= targetRiskForEntry + 0.1) {
-                            quantities[idx]++;
-                            currentTotalRisk += rps;
-                            added = true;
-                        }
-                    }
-                }
-                if (!added) break;
-            }
-
-            // Safety Valve
-            while (currentTotalRisk > totalRiskAmt + 0.05) {
+            // 1. Reduce if Cost exceeds Margin (Capital * Leverage)
+            while (currentTotalCost > maxCapital) {
                 let reduced = false;
                 for (let idx = 0; idx < entries.length; idx++) {
                     if (quantities[idx] > 0) {
                         quantities[idx]--;
                         currentTotalRisk -= riskPerShares[idx];
+                        currentTotalCost -= entries[idx];
+                        reduced = true;
+                        if (currentTotalCost <= maxCapital) break;
+                    }
+                }
+                if (!reduced) break;
+            }
+
+            // 2. Reduce if Risk exceeds Total Risk (Safety Valve 1)
+            while (currentTotalRisk > totalRiskAmt + 0.05) {
+                 let reduced = false;
+                for (let idx = 0; idx < entries.length; idx++) {
+                    if (quantities[idx] > 0) {
+                        quantities[idx]--;
+                        currentTotalRisk -= riskPerShares[idx];
+                        currentTotalCost -= entries[idx];
                         reduced = true;
                         if (currentTotalRisk <= totalRiskAmt) break;
                     }
                 }
                 if (!reduced) break;
             }
+
+
+            // 3. Optimization loop: Fill remaining risk up to entry-specific target risk, checking Margin too
+            for (let i = 0; i < 100; i++) {
+                let added = false;
+                for (let idx = 0; idx < entries.length; idx++) {
+                    const rps = riskPerShares[idx];
+                    const price = entries[idx];
+                    if (rps > 0) {
+                        const targetRiskForEntry = totalRiskAmt * weights[idx];
+                        const currentRiskForEntry = quantities[idx] * rps;
+
+                        // Strict respect for both total limit, individual target weight, AND MARGIN
+                        // Using a small epsilon for float comparison safety
+                        if (currentTotalRisk + rps <= totalRiskAmt + 0.01 && 
+                            currentRiskForEntry + rps <= targetRiskForEntry + 0.1 &&
+                            currentTotalCost + price <= maxCapital) {
+                            
+                            quantities[idx]++;
+                            currentTotalRisk += rps;
+                            currentTotalCost += price;
+                            added = true;
+                        }
+                    }
+                }
+                if (!added) break;
+            }
+            
             return quantities;
         }
 
@@ -872,7 +897,8 @@
                 entryQtys[2] = parseFloat(document.getElementById('inst-q3').value) || 0;
             } else {
                 // AUTO Mode: Use the finalWeights (intelligent distribution)
-                entryQtys = calculateSafeQuantities(totalRiskAmt, entries, sl, finalWeights);
+                const maxCapital = capital * leverage;
+                entryQtys = calculateSafeQuantities(totalRiskAmt, entries, sl, finalWeights, maxCapital);
 
                 document.getElementById('inst-q1').value = e1 > 0 ? entryQtys[0] : (hasEntry ? "0" : "");
                 document.getElementById('inst-q2').value = e2 > 0 ? entryQtys[1] : (hasEntry ? "0" : "");
