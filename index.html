@@ -65,6 +65,8 @@
                     <button onclick="showTab('institutional')" id="btn-institutional"
                         class="px-3 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-500 transition-colors whitespace-nowrap">Institutional
                         Mgr</button>
+                    <button onclick="showTab('valuation')" id="btn-valuation"
+                        class="px-3 py-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors whitespace-nowrap">Valuation</button>
                     <button onclick="showTab('simulator')" id="btn-simulator"
                         class="px-3 py-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors whitespace-nowrap">Risk
                         Simulator</button>
@@ -208,6 +210,230 @@
         </div>
 
 
+        <div id="tab-valuation" class="hidden space-y-6">
+            <!-- Intrinsic Price Calculator & PE Comparison -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Intrinsic Price -->
+                <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-xl">
+                    <div class="flex items-center gap-2 mb-4 border-b border-slate-700 pb-2">
+                        <div class="p-1.5 bg-green-500/10 rounded-lg">
+                            <i data-lucide="calculator" class="text-green-500 w-5 h-5"></i>
+                        </div>
+                        <h2 class="text-base font-semibold text-white">Intrinsic Price Calculator</h2>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-4 items-center">
+                            <label class="text-xs text-slate-400">Average EPS or Last Year</label>
+                            <input type="number" id="val-intrinsic-eps" oninput="calcValuation()" value="11115"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:ring-1 focus:ring-green-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 items-center">
+                            <label class="text-xs text-slate-400">FD interest Rate (%)</label>
+                            <input type="number" id="val-intrinsic-fd" oninput="calcValuation()" value="6.8"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:ring-1 focus:ring-green-500">
+                        </div>
+                        <div class="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-medium text-slate-500 uppercase">Fair Price</span>
+                                <span id="res-val-fair-price" class="text-lg font-bold text-emerald-400">₹0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stock vs Industry PE -->
+                <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-xl">
+                    <div class="flex items-center gap-2 mb-4 border-b border-slate-700 pb-2">
+                        <div class="p-1.5 bg-blue-500/10 rounded-lg">
+                            <i data-lucide="bar-chart-2" class="text-blue-500 w-5 h-5"></i>
+                        </div>
+                        <h2 class="text-base font-semibold text-white">PE Comparison</h2>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-4 items-center">
+                            <label class="text-xs text-slate-400">Stock P/E</label>
+                            <input type="number" id="val-pe-stock" oninput="calcValuation()" value="20.9"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:ring-1 focus:ring-blue-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 items-center">
+                            <label class="text-xs text-slate-400">Industry PE</label>
+                            <input type="number" id="val-pe-industry" oninput="calcValuation()" value="21.57"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:ring-1 focus:ring-blue-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="p-2 bg-slate-900/50 rounded-lg border border-slate-700 text-center">
+                                <p class="text-[10px] text-slate-500 uppercase">Difference</p>
+                                <p id="res-val-pe-diff" class="text-sm font-bold text-red-400">-0.67</p>
+                            </div>
+                            <div class="p-2 bg-slate-900/50 rounded-lg border border-slate-700 text-center">
+                                <p class="text-[10px] text-slate-500 uppercase">% Value</p>
+                                <p id="res-val-pe-pct" class="text-sm font-bold text-red-400">-3.11%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Based on PE & Based on PB -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Based on PE -->
+                <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-xl">
+                    <div class="flex items-center gap-2 mb-4 border-b border-slate-700 pb-2">
+                        <div class="p-1.5 bg-indigo-500/10 rounded-lg">
+                            <i data-lucide="layers" class="text-indigo-500 w-5 h-5"></i>
+                        </div>
+                        <h2 class="text-base font-semibold text-white">Based on PE</h2>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="grid grid-cols-3 gap-2 text-[10px] text-slate-500 uppercase font-bold px-1">
+                            <span>Condition</span>
+                            <span>PE</span>
+                            <span>Target Price</span>
+                        </div>
+                        <div
+                            class="grid grid-cols-3 gap-2 items-center bg-slate-900/40 p-2 rounded-lg border border-slate-700/50">
+                            <span class="text-xs text-slate-300">High PE</span>
+                            <input type="number" id="val-pe-high" oninput="calcValuation()" value="24.38"
+                                class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none">
+                            <span id="res-val-price-pe-high"
+                                class="text-xs font-bold text-indigo-400 text-right">₹0</span>
+                        </div>
+                        <div
+                            class="grid grid-cols-3 gap-2 items-center bg-slate-900/40 p-2 rounded-lg border border-slate-700/50">
+                            <span class="text-xs text-slate-300">Current PE</span>
+                            <input type="number" id="val-pe-curr" oninput="calcValuation()" value="21.76"
+                                class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none">
+                            <span id="res-val-price-pe-curr" class="text-xs font-bold text-white text-right">₹0</span>
+                        </div>
+                        <div
+                            class="grid grid-cols-3 gap-2 items-center bg-slate-900/40 p-2 rounded-lg border border-slate-700/50">
+                            <span class="text-xs text-slate-300">Low PE</span>
+                            <input type="number" id="val-pe-low" oninput="calcValuation()" value="19.67"
+                                class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none">
+                            <span id="res-val-price-pe-low" class="text-xs font-bold text-red-400 text-right">₹0</span>
+                        </div>
+                        <div class="mt-2 grid grid-cols-2 gap-2 items-center">
+                            <label class="text-xs text-slate-400">Average EPS</label>
+                            <input type="number" id="val-pe-eps" oninput="calcValuation()" value="1151.13"
+                                class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Based on PB -->
+                <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-xl">
+                    <div class="flex items-center gap-2 mb-4 border-b border-slate-700 pb-2">
+                        <div class="p-1.5 bg-orange-500/10 rounded-lg">
+                            <i data-lucide="book-open" class="text-orange-500 w-5 h-5"></i>
+                        </div>
+                        <h2 class="text-base font-semibold text-white">Based on PB</h2>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="grid grid-cols-3 gap-2 text-[10px] text-slate-500 uppercase font-bold px-1">
+                            <span>Condition</span>
+                            <span>PB</span>
+                            <span>Target Price</span>
+                        </div>
+                        <div
+                            class="grid grid-cols-3 gap-2 items-center bg-slate-900/40 p-2 rounded-lg border border-slate-700/50">
+                            <span class="text-xs text-slate-300">High PB</span>
+                            <input type="number" id="val-pb-high" oninput="calcValuation()" value="16.7"
+                                class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none">
+                            <span id="res-val-price-pb-high"
+                                class="text-xs font-bold text-orange-400 text-right">₹0</span>
+                        </div>
+                        <div
+                            class="grid grid-cols-3 gap-2 items-center bg-slate-900/40 p-2 rounded-lg border border-slate-700/50">
+                            <span class="text-xs text-slate-300">Current PB</span>
+                            <input type="number" id="val-pb-curr" oninput="calcValuation()" value="9.3"
+                                class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none">
+                            <span id="res-val-price-pb-curr" class="text-xs font-bold text-white text-right">₹0</span>
+                        </div>
+                        <div
+                            class="grid grid-cols-3 gap-2 items-center bg-slate-900/40 p-2 rounded-lg border border-slate-700/50">
+                            <span class="text-xs text-slate-300">Low PB</span>
+                            <input type="number" id="val-pb-low" oninput="calcValuation()" value="5.2"
+                                class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none">
+                            <span id="res-val-price-pb-low" class="text-xs font-bold text-red-400 text-right">₹0</span>
+                        </div>
+                        <div class="mt-2 grid grid-cols-2 gap-2 items-center">
+                            <label class="text-xs text-slate-400">Book Value</label>
+                            <input type="number" id="val-pb-bv" oninput="calcValuation()" value="49.1"
+                                class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Based on EPS Variation -->
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-xl">
+                <div class="flex items-center gap-2 mb-4 border-b border-slate-700 pb-2">
+                    <div class="p-1.5 bg-purple-500/10 rounded-lg">
+                        <i data-lucide="trending-up" class="text-purple-500 w-5 h-5"></i>
+                    </div>
+                    <h2 class="text-base font-semibold text-white">Based on EPS Variation</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-3 gap-4 text-[10px] text-slate-500 uppercase font-bold px-1">
+                            <span>Metrics</span>
+                            <span>Value</span>
+                            <span>EPS</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 items-center">
+                            <span class="text-xs text-slate-300">Old</span>
+                            <input type="number" id="val-eps-old-pe" oninput="calcValuation()" value="18.3"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-white text-xs outline-none focus:ring-1 focus:ring-purple-500"
+                                placeholder="PE">
+                            <input type="number" id="val-eps-old-val" oninput="calcValuation()" value="46"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-white text-xs outline-none focus:ring-1 focus:ring-purple-500"
+                                placeholder="EPS">
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 items-center">
+                            <span class="text-xs text-slate-300">Current</span>
+                            <input type="number" id="val-eps-curr-pe" oninput="calcValuation()" value="24.6"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-white text-xs outline-none focus:ring-1 focus:ring-purple-500"
+                                placeholder="PE">
+                            <input type="number" id="val-eps-curr-val" oninput="calcValuation()" value="28.5"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-white text-xs outline-none focus:ring-1 focus:ring-purple-500"
+                                placeholder="EPS">
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 items-center">
+                            <span class="text-xs text-slate-300">% Value</span>
+                            <input type="number" id="val-eps-pct-pe" oninput="calcValuation()" value="15.24"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-white text-xs outline-none focus:ring-1 focus:ring-purple-500"
+                                placeholder="PE">
+                            <input type="number" id="val-eps-pct-val" oninput="calcValuation()" value="28.5"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-white text-xs outline-none focus:ring-1 focus:ring-purple-500"
+                                placeholder="EPS">
+                        </div>
+                    </div>
+                    <div class="flex flex-col justify-between space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="p-3 bg-slate-900/50 rounded-lg border border-slate-700 text-center">
+                                <p class="text-[10px] text-slate-500 uppercase">Old Price</p>
+                                <p id="res-val-eps-price-old" class="text-sm font-bold text-white">₹0</p>
+                            </div>
+                            <div class="p-3 bg-slate-900/50 rounded-lg border border-slate-700 text-center">
+                                <p class="text-[10px] text-slate-500 uppercase">Curr Price</p>
+                                <p id="res-val-eps-price-curr" class="text-sm font-bold text-white">₹0</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="p-3 bg-slate-900/50 rounded-lg border border-slate-700 text-center">
+                                <p class="text-[10px] text-slate-500 uppercase">% Value Price</p>
+                                <p id="res-val-eps-price-pct" class="text-sm font-bold text-white">₹0</p>
+                            </div>
+                            <div class="p-3 bg-slate-900/50 rounded-lg border border-slate-700 text-center">
+                                <p class="text-[10px] text-slate-500 uppercase">Growth/Deficit</p>
+                                <p id="res-val-eps-growth" class="text-sm font-bold text-red-400">0.00%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="tab-institutional" class="hidden space-y-6">
             <div class="bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-700 shadow-xl">
                 <div class="flex items-center gap-3 mb-2 border-b border-slate-700 pb-2">
@@ -215,7 +441,7 @@
                         <i data-lucide="shield-check" class="text-indigo-500 w-5 h-5"></i>
                     </div>
                     <div>
-                        <h2 class="text-base font-semibold text-white">Institutional Risk Manager</h2>
+                        <h2 class="text-base font-semibold text-white">Risk Manager</h2>
                     </div>
                 </div>
 
@@ -583,7 +809,7 @@
                         <div class="bg-slate-900/60 rounded-xl border border-slate-700/50 p-3">
                             <h3 class="text-indigo-400 font-semibold flex items-center gap-2 mb-2 text-xs">
                                 <i data-lucide="calendar" class="w-4 h-4 text-emerald-400"></i> Monthly Return
-                                Calculator (Pro)
+                                Calculator
                             </h3>
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
                                 <div>
@@ -658,8 +884,8 @@
 
         // Tab Switching Logic
         function showTab(tabName) {
-            const tabIds = ['tab-institutional', 'tab-simulator'];
-            const buttonIds = ['btn-institutional', 'btn-simulator'];
+            const tabIds = ['tab-institutional', 'tab-simulator', 'tab-valuation'];
+            const buttonIds = ['btn-institutional', 'btn-simulator', 'btn-valuation'];
 
             tabIds.forEach(id => {
                 const el = document.getElementById(id);
@@ -681,6 +907,7 @@
             if (activeBtn) {
                 activeBtn.classList.remove('text-slate-400');
                 if (tabName === 'simulator') activeBtn.classList.add('bg-red-600', 'text-white');
+                else if (tabName === 'valuation') activeBtn.classList.add('bg-green-600', 'text-white');
                 else activeBtn.classList.add('bg-indigo-600', 'text-white');
             }
         }
@@ -695,6 +922,8 @@
             calcMonthlyReturn();
             initSurvivalChart();
             calcSurvival();
+            calcValuation();
+            initInstitutionalDrag();
         }
 
         // Helper for formatting currency (Indian Rupees)
@@ -708,6 +937,86 @@
         // Helper for formatting percentage
         function formatPercent(amount) {
             return amount.toFixed(2) + '%';
+        }
+
+        // Valuation Calculator Logic
+        function calcValuation() {
+            // 1. Intrinsic Price Calculator
+            const intEPS = parseFloat(document.getElementById('val-intrinsic-eps').value) || 0;
+            const intFD = parseFloat(document.getElementById('val-intrinsic-fd').value) || 1;
+            const fairPrice = intEPS / (intFD / 100);
+            document.getElementById('res-val-fair-price').innerText = formatCurrency(fairPrice);
+
+            // 2. PE Comparison
+            const peStock = parseFloat(document.getElementById('val-pe-stock').value) || 0;
+            const peInd = parseFloat(document.getElementById('val-pe-industry').value) || 1;
+
+            // In the image, these are basically just displaying the difference
+            const peDiff = peStock - peInd;
+            const pePct = (peDiff / peInd) * 100;
+
+            const peDiffEl = document.getElementById('res-val-pe-diff');
+            const pePctEl = document.getElementById('res-val-pe-pct');
+
+            peDiffEl.innerText = peDiff.toFixed(2);
+            pePctEl.innerText = formatPercent(pePct);
+
+            // Color based on valuation (overvalued vs undervalued)
+            if (peDiff > 0) {
+                peDiffEl.className = 'text-sm font-bold text-red-400';
+                pePctEl.className = 'text-sm font-bold text-red-400';
+            } else {
+                peDiffEl.className = 'text-sm font-bold text-emerald-400';
+                pePctEl.className = 'text-sm font-bold text-emerald-400';
+            }
+
+            // 3. Based on PE
+            const peEps = parseFloat(document.getElementById('val-pe-eps').value) || 0;
+            const peHigh = parseFloat(document.getElementById('val-pe-high').value) || 0;
+            const peCurr = parseFloat(document.getElementById('val-pe-curr').value) || 0;
+            const peLow = parseFloat(document.getElementById('val-pe-low').value) || 0;
+
+            document.getElementById('res-val-price-pe-high').innerText = formatCurrency(peEps * peHigh);
+            document.getElementById('res-val-price-pe-curr').innerText = formatCurrency(peEps * peCurr);
+            document.getElementById('res-val-price-pe-low').innerText = formatCurrency(peEps * peLow);
+
+            // 4. Based on PB
+            const pbBv = parseFloat(document.getElementById('val-pb-bv').value) || 0;
+            const pbHigh = parseFloat(document.getElementById('val-pb-high').value) || 0;
+            const pbCurr = parseFloat(document.getElementById('val-pb-curr').value) || 0;
+            const pbLow = parseFloat(document.getElementById('val-pb-low').value) || 0;
+
+            document.getElementById('res-val-price-pb-high').innerText = formatCurrency(pbBv * pbHigh);
+            document.getElementById('res-val-price-pb-curr').innerText = formatCurrency(pbBv * pbCurr);
+            document.getElementById('res-val-price-pb-low').innerText = formatCurrency(pbBv * pbLow);
+
+            // 5. Based on EPS Variation
+            const epsOldPe = parseFloat(document.getElementById('val-eps-old-pe').value) || 0;
+            const epsOldVal = parseFloat(document.getElementById('val-eps-old-val').value) || 0;
+            const epsCurrPe = parseFloat(document.getElementById('val-eps-curr-pe').value) || 0;
+            const epsCurrVal = parseFloat(document.getElementById('val-eps-curr-val').value) || 0;
+            const epsPctPe = parseFloat(document.getElementById('val-eps-pct-pe').value) || 0;
+            const epsPctVal = parseFloat(document.getElementById('val-eps-pct-val').value) || 0;
+
+            const priceOld = epsOldPe * epsOldVal;
+            const priceCurr = epsCurrPe * epsCurrVal;
+            const pricePct = epsPctPe * epsPctVal;
+
+            // Logic for growth/deficit as per image: (Curr EPS - Old EPS) / Old EPS
+            const growth = epsOldVal !== 0 ? ((epsCurrVal - epsOldVal) / epsOldVal) * 100 : 0;
+
+            document.getElementById('res-val-eps-price-old').innerText = formatCurrency(priceOld);
+            document.getElementById('res-val-eps-price-curr').innerText = formatCurrency(priceCurr);
+            document.getElementById('res-val-eps-price-pct').innerText = formatCurrency(pricePct);
+
+            const growthEl = document.getElementById('res-val-eps-growth');
+            growthEl.innerText = formatPercent(growth);
+
+            if (growth >= 0) {
+                growthEl.className = 'text-sm font-bold text-emerald-400';
+            } else {
+                growthEl.className = 'text-sm font-bold text-red-400';
+            }
         }
 
 
